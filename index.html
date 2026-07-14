@@ -60,7 +60,14 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
 <div id="mx"></div>
 
 <form id="hf" method="POST" action="https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce" target="hidden_iframe">
-  <input type="hidden" name="data" id="hd">
+  <input type="hidden" name="base_token" id="f_base_token">
+  <input type="hidden" name="table_id" id="f_table_id">
+  <input type="hidden" name="record_id" id="f_record_id">
+  <input type="hidden" name="image_base64" id="f_image_base64">
+  <input type="hidden" name="sign_field" id="f_sign_field">
+  <input type="hidden" name="status_field" id="f_status_field">
+  <input type="hidden" name="status_value" id="f_status_value">
+  <input type="hidden" name="time_field" id="f_time_field">
 </form>
 <iframe name="hidden_iframe" style="display:none"></iframe>
 
@@ -206,7 +213,7 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
     document.getElementById('o2').textContent = '';
     document.getElementById('bx2').style.display = 'none';
 
-    var payload = JSON.stringify({
+    var payload = {
       base_token: BT,
       table_id: TID,
       record_id: RID,
@@ -215,9 +222,18 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
       status_field: STF,
       status_value: STV,
       time_field: TMF
-    });
+    };
 
-    document.getElementById('hd').value = payload;
+    // 逐字段赋值，而非 JSON 打包
+    document.getElementById('f_base_token').value = BT;
+    document.getElementById('f_table_id').value = TID;
+    document.getElementById('f_record_id').value = RID;
+    document.getElementById('f_image_base64').value = imageData;
+    document.getElementById('f_sign_field').value = SF;
+    document.getElementById('f_status_field').value = STF;
+    document.getElementById('f_status_value').value = STV;
+    document.getElementById('f_time_field').value = TMF;
+
     document.getElementById('hf').submit();
 
     setTimeout(function() {
