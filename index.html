@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>签字确认</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;align-items:center;justify-content:center}
+#x{width:min(460px,94vw);background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.1);overflow:hidden}
+#h{background:linear-gradient(135deg,#E02923,#C4241E);padding:16px 20px;color:#fff;text-align:center}
+#h h1{font-size:1.1rem;margin:0}
+#m{padding:16px}
+#cv{border:2px dashed #ddd;border-radius:12px;overflow:hidden;background:#fff;touch-action:none;position:relative}
+#cv canvas{display:block;width:100%;cursor:crosshair}
+#cv .tp{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#bbb;font-size:1rem;pointer-events:none}
+#cv.on{border-color:#E02923}
+#cv .tp.off{display:none}
+#bt{display:flex;gap:10px;margin-top:12px}
+#bt button{flex:1;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer}
+#bt .cl{background:#f0f0f0;color:#666}
+#bt .ok{background:#E02923;color:#fff}
+#ot{display:none;margin-top:14px;text-align:center}
+#ot.s{display:block}
+#ot img{border:1px solid #eee;border-radius:8px;max-width:100%;max-height:130px}
+#ot .t1{font-size:.9rem;margin:8px 0 4px;font-weight:600}
+#ot .t1.g{color:#0a0}
+#ot .t1.e{color:#E02923}
+#ot .t1.w{color:#1a73e8}
+#ot .t2{font-size:.8rem;color:#888}
+#ot .bx{display:flex;gap:8px;margin-top:12px}
+#ot .bx button{flex:1;padding:14px;border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;background:#1a73e8;color:#fff}
+#mx{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 20px;border-radius:20px;font-size:.8rem;opacity:0;transition:opacity .3s;z-index:999}
+#mx.s{opacity:1}
+</style>
+</head>
+<body>
+<div id="x">
+  <div id="h"><h1>✍️ 签字确认</h1></div>
+  <div id="m">
+    <div id="cv">
+      <canvas id="c"></canvas>
+      <div class="tp" id="tp">👆 在此处签名</div>
+    </div>
+    <div id="bt">
+      <button class="cl" onclick="clearCanvas()">🗑 清除重签</button>
+      <button class="ok" onclick="submitSignature()">✅ 确认签字并提交</button>
+    </div>
+    <div id="ot">
+      <img id="oi" src="" alt="签名">
+      <p class="t1 w" id="o1">正在提交...</p>
+      <p class="t2" id="o2"></p>
+      <div class="bx" id="bx2" style="display:none">
+        <button onclick="retrySubmit()">🔄 重试</button>
+        <button onclick="copyImage()">📋 手动复制</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="mx"></div>
+
+<form id="hf" method="POST" action="https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce" target="hidden_iframe">
+  <input type="hidden" name="data" id="hd">
+</form>
+<iframe name="hidden_iframe" style="display:none"></iframe>
+
+<script>
+(function() {
+  // ===== 从 URL 参数读取所有配置 =====
+  function getParam(name) {
+    var m = location.href.match(new RegExp('[?&#]' + name + '=([^&#]+)'));
+    if (m) return decodeURIComponent(m[1]);
+    return '';
+  }
+
+  var RID = getParam('id') || '';
+  var BT  = getParam('base_token') || 'Zx9nb5vIUaRkNSsVFUXcdYV7ngB';
+  var TID = getParam('table_id') || 'tbl0J9qFTBzWZQ6Z';
+  var SF  = getParam('sign_field') || '签字附件';
+  var STF = getParam('status_field') || '签字状态';
+  var STV = getParam('status_value') || '已签字';
+  var TMF = getParam('time_field') || '签字时间';
+
+  // ===== 状态提示 =====
+  if (!RID) {
+    showToast('⚠️ 缺少记录ID，请从多维表链接进入');
+  } else {
+    showToast('📋 ' + RID.substring(0, 16) + '... 请签名');
+  }
+
+  // ===== 画布初始化 =====
+  var cv = document.getElementById('c');
+  var cx = cv.getContext('2d');
+  var pb = document.getElementById('cv');
+  var tp = document.getElementById('tp');
+  var drawing = false;
+  var hasDrawn = false;
+  var imageData = '';
+  var submitted = false;
+
+  function resize() {
+    var r = pb.getBoundingClientRect();
+    var w = r.width;
+    var h = Math.round(w * 0.4);
+    var d = window.devicePixelRatio || 1;
+    cv.width = w * d;
+    cv.height = h * d;
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cx.setTransform(d, 0, 0, d, 0, 0);
+    cx.strokeStyle = '#1a1a1a';
+    cx.lineWidth = 3;
+    cx.lineCap = 'round';
+    cx.lineJoin = 'round';
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // ===== 笔迹事件 =====
+  function getPos(e) {
+    var r = cv.getBoundingClientRect();
+    return {
+      x: (e.touches ? e.touches[0].clientX : e.clientX) - r.left,
+      y: (e.touches ? e.touches[0].clientY : e.clientY) - r.top
+    };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    drawing = true;
+    hasDrawn = true;
+    tp.classList.add('off');
+    pb.classList.add('on');
+    var o = getPos(e);
+    cx.beginPath();
+    cx.moveTo(o.x, o.y);
+  }
+
+  function moveDraw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    var o = getPos(e);
+    cx.lineTo(o.x, o.y);
+    cx.stroke();
+  }
+
+  function endDraw(e) {
+    drawing = false;
+    pb.classList.remove('on');
+  }
+
+  cv.addEventListener('mousedown', startDraw);
+  cv.addEventListener('mousemove', moveDraw);
+  cv.addEventListener('mouseup', endDraw);
+  cv.addEventListener('mouseleave', endDraw);
+  cv.addEventListener('touchstart', startDraw, { passive: false });
+  cv.addEventListener('touchmove', moveDraw, { passive: false });
+  cv.addEventListener('touchend', endDraw);
+
+  // ===== 按钮操作 =====
+  window.clearCanvas = function() {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    hasDrawn = false;
+    imageData = '';
+    tp.classList.remove('off');
+    document.getElementById('ot').classList.remove('s');
+    submitted = false;
+  };
+
+  window.submitSignature = function() {
+    if (!hasDrawn) { showToast('请先签名'); return; }
+    if (submitted) return;
+    if (!RID) { showToast('缺少记录ID，无法提交'); return; }
+
+    imageData = cv.toDataURL('image/png');
+    document.getElementById('oi').src = imageData;
+    document.getElementById('ot').classList.add('s');
+    document.getElementById('o1').className = 't1 w';
+    document.getElementById('o1').textContent = '正在提交...';
+    document.getElementById('o2').textContent = '';
+    document.getElementById('bx2').style.display = 'none';
+    doSubmit();
+  };
+
+  window.retrySubmit = function() {
+    doSubmit();
+  };
+
+  window.copyImage = function() {
+    if (!imageData) return;
+    cv.toBlob(function(b) {
+      try {
+        navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
+        showToast('已复制签名图片');
+      } catch (e) {
+        showToast('复制失败，请截图保存');
+      }
+    }, 'image/png');
+  };
+
+  // ===== 提交流程 =====
+  function doSubmit() {
+    submitted = true;
+    document.getElementById('o1').className = 't1 w';
+    document.getElementById('o1').textContent = '正在提交...';
+    document.getElementById('o2').textContent = '';
+    document.getElementById('bx2').style.display = 'none';
+
+    var payload = JSON.stringify({
+      base_token: BT,
+      table_id: TID,
+      record_id: RID,
+      image_base64: imageData,
+      sign_field: SF,
+      status_field: STF,
+      status_value: STV,
+      time_field: TMF
+    });
+
+    document.getElementById('hd').value = payload;
+    document.getElementById('hf').submit();
+
+    setTimeout(function() {
+      submitted = false;
+      document.getElementById('o1').textContent = '已提交';
+      document.getElementById('o1').className = 't1 g';
+      document.getElementById('o2').textContent = '请检查多维表确认结果';
+      showToast('已提交到多维表');
+    }, 3000);
+  }
+
+  // ===== Toast =====
+  function showToast(msg) {
+    var m = document.getElementById('mx');
+    m.textContent = msg;
+    m.classList.add('s');
+    clearTimeout(m._t);
+    m._t = setTimeout(function() { m.classList.remove('s'); }, 3000);
+  }
+})();
+</script>
+</body>
+</html>
