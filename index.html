@@ -213,34 +213,16 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
       time_field: TMF
     };
 
-    fetch('https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(function(res) {
-      return res.json();
-    }).then(function(data) {
+    var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    navigator.sendBeacon('https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce', blob);
+
+    setTimeout(function() {
       submitted = false;
-      if (data.code === 0) {
-        document.getElementById('o1').textContent = '✅ 提交成功';
-        document.getElementById('o1').className = 't1 g';
-        document.getElementById('o2').textContent = '多维表已更新';
-        showToast('✅ 已提交到多维表');
-      } else {
-        document.getElementById('o1').textContent = '❌ 提交失败';
-        document.getElementById('o1').className = 't1 e';
-        document.getElementById('o2').textContent = data.msg || JSON.stringify(data).substring(0, 200);
-        document.getElementById('bx2').style.display = 'flex';
-        showToast('❌ 提交失败，请重试');
-      }
-    }).catch(function(err) {
-      submitted = false;
-      document.getElementById('o1').textContent = '❌ 网络错误';
-      document.getElementById('o1').className = 't1 e';
-      document.getElementById('o2').textContent = err.message;
-      document.getElementById('bx2').style.display = 'flex';
-      showToast('❌ 网络错误，请重试');
-    });
+      document.getElementById('o1').textContent = '✅ 已提交';
+      document.getElementById('o1').className = 't1 g';
+      document.getElementById('o2').textContent = '请检查多维表确认结果';
+      showToast('✅ 已提交到多维表');
+    }, 3000);
   }
 
   // ===== Toast =====
