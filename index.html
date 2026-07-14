@@ -213,8 +213,12 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
       time_field: TMF
     };
 
-    var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-    navigator.sendBeacon('https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce', blob);
+    fetch('https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce', {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
 
     setTimeout(function() {
       submitted = false;
