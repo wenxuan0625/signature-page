@@ -59,17 +59,6 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
 </div>
 <div id="mx"></div>
 
-<form id="hf" method="POST" action="https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce" target="hidden_iframe">
-  <input type="hidden" name="base_token" id="f_base_token">
-  <input type="hidden" name="table_id" id="f_table_id">
-  <input type="hidden" name="record_id" id="f_record_id">
-  <input type="hidden" name="image_base64" id="f_image_base64">
-  <input type="hidden" name="sign_field" id="f_sign_field">
-  <input type="hidden" name="status_field" id="f_status_field">
-  <input type="hidden" name="status_value" id="f_status_value">
-  <input type="hidden" name="time_field" id="f_time_field">
-</form>
-<iframe name="hidden_iframe" style="display:none"></iframe>
 
 <script>
 (function() {
@@ -224,25 +213,34 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
       time_field: TMF
     };
 
-    // 逐字段赋值，而非 JSON 打包
-    document.getElementById('f_base_token').value = BT;
-    document.getElementById('f_table_id').value = TID;
-    document.getElementById('f_record_id').value = RID;
-    document.getElementById('f_image_base64').value = imageData;
-    document.getElementById('f_sign_field').value = SF;
-    document.getElementById('f_status_field').value = STF;
-    document.getElementById('f_status_value').value = STV;
-    document.getElementById('f_time_field').value = TMF;
-
-    document.getElementById('hf').submit();
-
-    setTimeout(function() {
+    fetch('https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function(res) {
+      return res.json();
+    }).then(function(data) {
       submitted = false;
-      document.getElementById('o1').textContent = '已提交';
-      document.getElementById('o1').className = 't1 g';
-      document.getElementById('o2').textContent = '请检查多维表确认结果';
-      showToast('已提交到多维表');
-    }, 3000);
+      if (data.code === 0) {
+        document.getElementById('o1').textContent = '✅ 提交成功';
+        document.getElementById('o1').className = 't1 g';
+        document.getElementById('o2').textContent = '多维表已更新';
+        showToast('✅ 已提交到多维表');
+      } else {
+        document.getElementById('o1').textContent = '❌ 提交失败';
+        document.getElementById('o1').className = 't1 e';
+        document.getElementById('o2').textContent = data.msg || JSON.stringify(data).substring(0, 200);
+        document.getElementById('bx2').style.display = 'flex';
+        showToast('❌ 提交失败，请重试');
+      }
+    }).catch(function(err) {
+      submitted = false;
+      document.getElementById('o1').textContent = '❌ 网络错误';
+      document.getElementById('o1').className = 't1 e';
+      document.getElementById('o2').textContent = err.message;
+      document.getElementById('bx2').style.display = 'flex';
+      showToast('❌ 网络错误，请重试');
+    });
   }
 
   // ===== Toast =====
