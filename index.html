@@ -11,11 +11,24 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
 #h{background:linear-gradient(135deg,#E02923,#C4241E);padding:16px 20px;color:#fff;text-align:center}
 #h h1{font-size:1.1rem;margin:0}
 #m{padding:16px}
+/* 选项卡 */
+#tabs{display:flex;gap:0;margin-bottom:12px;border-radius:10px;overflow:hidden;border:2px solid #E02923}
+#tabs button{flex:1;padding:10px;border:none;font-size:.9rem;font-weight:600;cursor:pointer;background:#fff;color:#E02923}
+#tabs button.on{background:#E02923;color:#fff}
+/* 手写区域 */
 #cv{border:2px dashed #ddd;border-radius:12px;overflow:hidden;background:#fff;touch-action:none;position:relative}
 #cv canvas{display:block;width:100%;cursor:crosshair}
 #cv .tp{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#bbb;font-size:1rem;pointer-events:none}
 #cv.on{border-color:#E02923}
 #cv .tp.off{display:none}
+/* 上传区域 */
+#up{display:none;border:2px dashed #ddd;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#fafafa;transition:border-color .2s}
+#up:hover,#up.drag{border-color:#E02923}
+#up .up-icon{font-size:2.5rem;margin-bottom:8px}
+#up .up-text{color:#888;font-size:.9rem}
+#up input{display:none}
+#up img{max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;display:none}
+/* 按钮 */
 #bt{display:flex;gap:10px;margin-top:12px}
 #bt button{flex:1;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer}
 #bt .cl{background:#f0f0f0;color:#666}
@@ -38,12 +51,28 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
 <div id="x">
   <div id="h"><h1>✍️ 签字确认</h1></div>
   <div id="m">
+    <!-- 选项卡 -->
+    <div id="tabs">
+      <button class="on" onclick="switchTab('draw')">✏️ 手写签字</button>
+      <button onclick="switchTab('upload')">📎 上传签字</button>
+    </div>
+
+    <!-- 手写区域 -->
     <div id="cv">
       <canvas id="c"></canvas>
       <div class="tp" id="tp">👆 在此处签名</div>
     </div>
+
+    <!-- 上传区域 -->
+    <div id="up">
+      <div class="up-icon">🖼️</div>
+      <div class="up-text">点击或拖拽上传签字图片<br>支持 JPG / PNG</div>
+      <input type="file" id="uf" accept="image/jpeg,image/png">
+      <img id="uimg" src="" alt="预览">
+    </div>
+
     <div id="bt">
-      <button class="cl" onclick="clearCanvas()">🗑 清除重签</button>
+      <button class="cl" onclick="clearAll()">🗑 清除重签</button>
       <button class="ok" onclick="submitSignature()">✅ 确认签字并提交</button>
     </div>
     <div id="ot">
@@ -59,10 +88,9 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
 </div>
 <div id="mx"></div>
 
-
 <script>
 (function() {
-  // ===== 从 URL 参数读取所有配置 =====
+  // ===== URL 参数 =====
   function getParam(name) {
     var m = location.href.match(new RegExp('[?&#]' + name + '=([^&#]+)'));
     if (m) return decodeURIComponent(m[1]);
@@ -77,14 +105,10 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
   var STV = getParam('status_value') || '已签字';
   var TMF = getParam('time_field') || '签字时间';
 
-  // ===== 状态提示 =====
-  if (!RID) {
-    showToast('⚠️ 缺少记录ID，请从多维表链接进入');
-  } else {
-    showToast('📋 ' + RID.substring(0, 16) + '... 请签名');
-  }
+  if (!RID) { showToast('⚠️ 缺少记录ID，请从多维表链接进入'); }
+  else { showToast('📋 ' + RID.substring(0, 16) + '... 请签名'); }
 
-  // ===== 画布初始化 =====
+  // ===== 画布（手写） =====
   var cv = document.getElementById('c');
   var cx = cv.getContext('2d');
   var pb = document.getElementById('cv');
@@ -93,26 +117,22 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
   var hasDrawn = false;
   var imageData = '';
   var submitted = false;
+  var currentTab = 'draw';
 
-  function resize() {
+  function resizeCanvas() {
     var r = pb.getBoundingClientRect();
-    var w = r.width;
-    var h = Math.round(w * 0.4);
-    var d = window.devicePixelRatio || 1;
-    cv.width = w * d;
-    cv.height = h * d;
-    cv.style.width = w + 'px';
-    cv.style.height = h + 'px';
+    var w = r.width, h = Math.round(w * 0.4), d = window.devicePixelRatio || 1;
+    cv.width = w * d; cv.height = h * d;
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
     cx.setTransform(d, 0, 0, d, 0, 0);
     cx.strokeStyle = '#1a1a1a';
-    cx.lineWidth = 3;
+    cx.lineWidth = 1.5;
     cx.lineCap = 'round';
     cx.lineJoin = 'round';
   }
-  resize();
-  window.addEventListener('resize', resize);
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
 
-  // ===== 笔迹事件 =====
   function getPos(e) {
     var r = cv.getBoundingClientRect();
     return {
@@ -120,31 +140,9 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
       y: (e.touches ? e.touches[0].clientY : e.clientY) - r.top
     };
   }
-
-  function startDraw(e) {
-    e.preventDefault();
-    drawing = true;
-    hasDrawn = true;
-    tp.classList.add('off');
-    pb.classList.add('on');
-    var o = getPos(e);
-    cx.beginPath();
-    cx.moveTo(o.x, o.y);
-  }
-
-  function moveDraw(e) {
-    if (!drawing) return;
-    e.preventDefault();
-    var o = getPos(e);
-    cx.lineTo(o.x, o.y);
-    cx.stroke();
-  }
-
-  function endDraw(e) {
-    drawing = false;
-    pb.classList.remove('on');
-  }
-
+  function startDraw(e) { e.preventDefault(); drawing = true; hasDrawn = true; tp.classList.add('off'); pb.classList.add('on'); var o = getPos(e); cx.beginPath(); cx.moveTo(o.x, o.y); }
+  function moveDraw(e) { if (!drawing) return; e.preventDefault(); var o = getPos(e); cx.lineTo(o.x, o.y); cx.stroke(); }
+  function endDraw(e) { drawing = false; pb.classList.remove('on'); }
   cv.addEventListener('mousedown', startDraw);
   cv.addEventListener('mousemove', moveDraw);
   cv.addEventListener('mouseup', endDraw);
@@ -153,22 +151,89 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
   cv.addEventListener('touchmove', moveDraw, { passive: false });
   cv.addEventListener('touchend', endDraw);
 
-  // ===== 按钮操作 =====
-  window.clearCanvas = function() {
-    cx.clearRect(0, 0, cv.width, cv.height);
-    hasDrawn = false;
-    imageData = '';
-    tp.classList.remove('off');
+  // ===== 选项卡切换 =====
+  window.switchTab = function(tab) {
+    currentTab = tab;
+    document.getElementById('tabs').children[0].className = tab === 'draw' ? 'on' : '';
+    document.getElementById('tabs').children[1].className = tab === 'upload' ? 'on' : '';
+    if (tab === 'draw') {
+      document.getElementById('cv').style.display = 'block';
+      document.getElementById('up').style.display = 'none';
+      document.getElementById('bt').children[0].textContent = '🗑 清除重签';
+    } else {
+      document.getElementById('cv').style.display = 'none';
+      document.getElementById('up').style.display = 'block';
+      document.getElementById('bt').children[0].textContent = '🗑 重新上传';
+    }
+    document.getElementById('ot').classList.remove('s');
+    submitted = false;
+  };
+
+  // ===== 上传区域 =====
+  var upDiv = document.getElementById('up');
+  var upInput = document.getElementById('uf');
+  var upImg = document.getElementById('uimg');
+
+  upDiv.addEventListener('click', function() { upInput.click(); });
+  upDiv.addEventListener('dragover', function(e) { e.preventDefault(); upDiv.classList.add('drag'); });
+  upDiv.addEventListener('dragleave', function() { upDiv.classList.remove('drag'); });
+  upDiv.addEventListener('drop', function(e) {
+    e.preventDefault();
+    upDiv.classList.remove('drag');
+    var file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  upInput.addEventListener('change', function() {
+    if (upInput.files[0]) handleFile(upInput.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.match(/image\/(jpeg|png)/)) { showToast('仅支持 JPG/PNG 格式'); return; }
+    var reader = new FileReader();
+    reader.onload = function() {
+      // 压缩大图：超过 800px 宽缩到 800px
+      var img = new Image();
+      img.onload = function() {
+        var w = img.width, h = img.height;
+        if (w > 800) { h = Math.round(h * 800 / w); w = 800; }
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        imageData = c.toDataURL('image/png');
+        upImg.src = imageData;
+        upImg.style.display = 'block';
+        hasDrawn = true;
+        document.getElementById('ot').classList.remove('s');
+        showToast('✅ 图片已加载');
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ===== 按钮 =====
+  window.clearAll = function() {
+    if (currentTab === 'draw') {
+      cx.clearRect(0, 0, cv.width, cv.height);
+      hasDrawn = false;
+      tp.classList.remove('off');
+    } else {
+      imageData = '';
+      hasDrawn = false;
+      upImg.src = '';
+      upImg.style.display = 'none';
+      upInput.value = '';
+    }
     document.getElementById('ot').classList.remove('s');
     submitted = false;
   };
 
   window.submitSignature = function() {
-    if (!hasDrawn) { showToast('请先签名'); return; }
+    if (!hasDrawn) { showToast('请先' + (currentTab === 'draw' ? '签名' : '上传签字图片')); return; }
     if (submitted) return;
     if (!RID) { showToast('缺少记录ID，无法提交'); return; }
 
-    imageData = cv.toDataURL('image/png');
+    if (currentTab === 'draw') imageData = cv.toDataURL('image/png');
     document.getElementById('oi').src = imageData;
     document.getElementById('ot').classList.add('s');
     document.getElementById('o1').className = 't1 w';
@@ -178,48 +243,23 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
     doSubmit();
   };
 
-  window.retrySubmit = function() {
-    doSubmit();
-  };
+  window.retrySubmit = function() { doSubmit(); };
 
   window.copyImage = function() {
     if (!imageData) return;
-    cv.toBlob(function(b) {
-      try {
-        navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
-        showToast('已复制签名图片');
-      } catch (e) {
-        showToast('复制失败，请截图保存');
-      }
-    }, 'image/png');
+    fetch(imageData).then(function(r) { return r.blob(); }).then(function(b) {
+      try { navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); showToast('已复制'); }
+      catch(e) { showToast('复制失败，请截图保存'); }
+    });
   };
 
   // ===== 提交流程 =====
   function doSubmit() {
     submitted = true;
-    document.getElementById('o1').className = 't1 w';
-    document.getElementById('o1').textContent = '正在提交...';
-    document.getElementById('o2').textContent = '';
-    document.getElementById('bx2').style.display = 'none';
-
-    var payload = {
-      base_token: BT,
-      table_id: TID,
-      record_id: RID,
-      image_base64: imageData,
-      sign_field: SF,
-      status_field: STF,
-      status_value: STV,
-      time_field: TMF
-    };
-
+    var payload = { base_token: BT, table_id: TID, record_id: RID, image_base64: imageData, sign_field: SF, status_field: STF, status_value: STV, time_field: TMF };
     fetch('https://gcnddw2f4zla.feishu.cn/ae/api/v1/automation/namespaces/package_b8c127__c/events/http/automation_5c5c80ffcce', {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
+      method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload)
     });
-
     setTimeout(function() {
       submitted = false;
       document.getElementById('o1').textContent = '✅ 已提交';
@@ -229,11 +269,9 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
     }, 3000);
   }
 
-  // ===== Toast =====
   function showToast(msg) {
     var m = document.getElementById('mx');
-    m.textContent = msg;
-    m.classList.add('s');
+    m.textContent = msg; m.classList.add('s');
     clearTimeout(m._t);
     m._t = setTimeout(function() { m.classList.remove('s'); }, 3000);
   }
