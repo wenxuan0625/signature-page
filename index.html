@@ -98,14 +98,15 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
   }
 
   var RID = getParam('id') || '';
-  var BT  = getParam('base_token') || 'Zx9nb5vIUaRkNSsVFUXcdYV7ngB';
-  var TID = getParam('table_id') || 'tbl0J9qFTBzWZQ6Z';
+  var BT  = getParam('base_token') || '';
+  var TID = getParam('table_id') || '';
   var SF  = getParam('sign_field') || '签字附件';
   var STF = getParam('status_field') || '签字状态';
   var STV = getParam('status_value') || '已签字';
   var TMF = getParam('time_field') || '签字时间';
 
   if (!RID) { showToast('⚠️ 缺少记录ID，请从多维表链接进入'); }
+  else if (!BT || !TID) { showToast('⚠️ 缺少表配置，请检查链接参数'); }
   else { showToast('📋 ' + RID.substring(0, 16) + '... 请签名'); }
 
   // ===== 画布（手写） =====
@@ -232,6 +233,7 @@ body{font-family:sans-serif;background:#f0f2f5;min-height:100vh;display:flex;ali
     if (!hasDrawn) { showToast('请先' + (currentTab === 'draw' ? '签名' : '上传签字图片')); return; }
     if (submitted) return;
     if (!RID) { showToast('缺少记录ID，无法提交'); return; }
+    if (!BT || !TID) { showToast('缺少表配置参数，请检查链接'); return; }
 
     if (currentTab === 'draw') imageData = cv.toDataURL('image/png');
     document.getElementById('oi').src = imageData;
